@@ -7,6 +7,7 @@ on:
 jobs:
   containerize:
     runs-on: ubuntu-latest
+    environment: dev
 
     env:
       # ===== MODEL INFO (FROM DATABRICKS) =====
