@@ -1,37 +1,29 @@
 import os
-import requests
-from databricks.sdk import WorkspaceClient
+import mlflow
+from mlflow.store.artifact.models_artifact_repo import ModelsArtifactRepository
+
+# Ensure you have MLflow installed: pip install mlflow
 
 MODEL_NAME = os.environ["MODEL_NAME"]
 MODEL_VERSION = os.environ["MODEL_VERSION"]
+LOCAL_PATH = "model"
 
-client = WorkspaceClient()
+# Set the MLflow tracking URI to "databricks" so it authenticates correctly
+mlflow.set_tracking_uri("databricks")
 
-print(f"📦 Preparing download for {MODEL_NAME} v{MODEL_VERSION}")
+print(f"📦 Downloading model {MODEL_NAME} version {MODEL_VERSION}")
 
-# 1️⃣ Get presigned download URL for UC model
-resp = client.model_versions.get_download_uri(
-    name=MODEL_NAME,
-    version=MODEL_VERSION
-)
+# Define the MLflow model URI using the "models:/" scheme
+model_uri = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
 
-download_url = resp.artifact_uri
-print("🔗 Got presigned download URL")
+# Create the destination directory if it doesn't exist
+os.makedirs(LOCAL_PATH, exist_ok=True)
 
-# 2️⃣ Download model artifacts as ZIP
-zip_path = "model.zip"
+# Use the ModelsArtifactRepository to download the artifacts
+# The "" as the first argument downloads the entire root of the model's artifacts
+try:
+    local_path = ModelsArtifactRepository(model_uri).download_artifacts("", dst_path=LOCAL_PATH)
+    print(f"✅ Model downloaded successfully to {local_path}")
+except Exception as e:
+    print(f"❌ Error during download: {e}")
 
-with requests.get(download_url, stream=True) as r:
-    r.raise_for_status()
-    with open(zip_path, "wb") as f:
-        for chunk in r.iter_content(chunk_size=8192):
-            f.write(chunk)
-
-print("✅ Model ZIP downloaded")
-
-# 3️⃣ Extract
-import zipfile
-with zipfile.ZipFile(zip_path, "r") as zip_ref:
-    zip_ref.extractall("model")
-
-print("✅ Model extracted to ./model")
