@@ -52,7 +52,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install mlflow databricks-sdk
+          pip install \
+            mlflow==2.12.2 \
+            databricks-sdk==0.36.0
+
 
       - name: Debug Databricks env
         run: |
