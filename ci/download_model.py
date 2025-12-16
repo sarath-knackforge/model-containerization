@@ -1,14 +1,15 @@
 import os
 from databricks.sdk import WorkspaceClient
 
-MODEL_NAME = os.environ["MODEL_NAME"]
-MODEL_VERSION = os.environ["MODEL_VERSION"]
+MODEL_NAME = os.environ["MODEL_NAME"]      # e.g. mlops_dev.model_test.model_deploy
+MODEL_VERSION = os.environ["MODEL_VERSION"]  # e.g. 136
 
 client = WorkspaceClient()
 
+# ✅ CORRECT SDK CALL (positional args)
 mv = client.model_versions.get(
-    name=MODEL_NAME,
-    version=MODEL_VERSION
+    MODEL_NAME,
+    MODEL_VERSION
 )
 
 artifact_uri = mv.storage_location
