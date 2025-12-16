@@ -47,6 +47,11 @@ jobs:
           pip install --upgrade pip
           pip install mlflow databricks-sdk
 
+      - name: Debug Databricks env
+        run: |
+          echo "HOST=$DATABRICKS_HOST"
+          echo "AUTH_TYPE=$DATABRICKS_AUTH_TYPE"
+
       # ------------------------------------------------
       # 4️⃣ Download model from Databricks UC
       # ------------------------------------------------
