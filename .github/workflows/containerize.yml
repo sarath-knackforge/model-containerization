@@ -5,46 +5,88 @@ on:
     types: [model_approved]
 
 jobs:
-  build-push:
+  containerize:
     runs-on: ubuntu-latest
-    environment: dev
+
+    env:
+      # ===== MODEL INFO (FROM DATABRICKS) =====
+      MODEL_NAME: ${{ github.event.client_payload.model_name }}
+      MODEL_VERSION: ${{ github.event.client_payload.model_version }}
+
+      # ===== DATABRICKS AUTH (SERVICE PRINCIPAL) =====
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+
+      # ===== AWS / ECR =====
+      AWS_REGION: ap-south-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPO: ml-models
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      # ------------------------------------------------
+      # 1️⃣ Checkout code
+      # ------------------------------------------------
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Install Python deps
-      run: pip install mlflow databricks-sdk
+      # ------------------------------------------------
+      # 2️⃣ Setup Python
+      # ------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Download model from Databricks
-      env:
-        DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-        DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-        DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
-        MODEL_NAME: ${{ github.event.client_payload.model_name }}
-        MODEL_VERSION: ${{ github.event.client_payload.version }}
-      run: python ci/download_model.py
+      # ------------------------------------------------
+      # 3️⃣ Install Python dependencies
+      # ------------------------------------------------
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install mlflow databricks-sdk
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ap-south-1
+      # ------------------------------------------------
+      # 4️⃣ Download model from Databricks UC
+      # ------------------------------------------------
+      - name: Download model from Databricks
+        run: python ci/download_model.py
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      # ------------------------------------------------
+      # 5️⃣ Login to AWS ECR
+      # ------------------------------------------------
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build Docker image
-      run: docker build -t ml-model:${{ github.event.client_payload.version }} .
+      # ------------------------------------------------
+      # 6️⃣ Build Docker image
+      # ------------------------------------------------
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg MODEL_PATH=model \
+            -t $ECR_REPO:$MODEL_VERSION \
+            .
 
-    - name: Tag image
-      run: |
-        docker tag ml-model:${{ github.event.client_payload.version }} \
-        ${{ steps.login-ecr.outputs.registry }}/ml-model:${{ github.event.client_payload.version }}
+      # ------------------------------------------------
+      # 7️⃣ Tag image
+      # ------------------------------------------------
+      - name: Tag Docker image
+        run: |
+          docker tag \
+            $ECR_REPO:$MODEL_VERSION \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$MODEL_VERSION
 
-    - name: Push image to ECR
-      run: |
-        docker push \
-        ${{ steps.login-ecr.outputs.registry }}/ml-model:${{ github.event.client_payload.version }}
+      # ------------------------------------------------
+      # 8️⃣ Push image to ECR
+      # ------------------------------------------------
+      - name: Push image to ECR
+        run: |
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$MODEL_VERSION
+
+      # ------------------------------------------------
+      # 9️⃣ Success log
+      # ------------------------------------------------
+      - name: Done
+        run: echo "✅ Model $MODEL_NAME version $MODEL_VERSION pushed to ECR"
