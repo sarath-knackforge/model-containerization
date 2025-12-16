@@ -19,6 +19,7 @@ jobs:
       DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
       DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
       DATABRICKS_AUTH_TYPE: oauth
+      MLFLOW_ENABLE_DB_SDK: "true"
 
       # ===== AWS / ECR =====
       AWS_REGION: ap-south-1
