@@ -27,6 +27,11 @@ jobs:
       ECR_REPO: ml-models
 
     steps:
+      - name: Debug MLflow env
+        run: |
+          echo "MLFLOW_ENABLE_DB_SDK=$MLFLOW_ENABLE_DB_SDK"
+          echo "DATABRICKS_AUTH_TYPE=$DATABRICKS_AUTH_TYPE"
+
       # ------------------------------------------------
       # 1️⃣ Checkout code
       # ------------------------------------------------
