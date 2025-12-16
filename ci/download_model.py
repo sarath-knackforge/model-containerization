@@ -1,19 +1,28 @@
 import os
-import mlflow
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import ml
 
-# CI ONLY
-mlflow.set_registry_uri("databricks-uc")
+MODEL_NAME = os.environ["MODEL_NAME"]
+MODEL_VERSION = os.environ["MODEL_VERSION"]
 
-model_name = os.environ["MODEL_NAME"]
-model_version = os.environ["MODEL_VERSION"]
+client = WorkspaceClient()
 
-model_uri = f"models:/{model_name}/{model_version}"
+# 1️⃣ Get model version info from Unity Catalog
+mv = client.model_versions.get(
+    name=MODEL_NAME,
+    version=MODEL_VERSION
+)
 
-print(f"📦 Downloading model from {model_uri}")
+# 2️⃣ Download model artifacts
+# This is the UC artifact location
+artifact_uri = mv.storage_location
 
-mlflow.artifacts.download_artifacts(
-    artifact_uri=model_uri,
-    dst_path="model"
+print(f"📦 Downloading model artifacts from: {artifact_uri}")
+
+client.files.download(
+    source_path=artifact_uri,
+    destination_path="model",
+    overwrite=True
 )
 
 print("✅ Model downloaded successfully")
