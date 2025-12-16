@@ -1,0 +1,49 @@
+name: Containerize ML Model
+
+on:
+  repository_dispatch:
+    types: [model_approved]
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Install Python deps
+      run: pip install mlflow databricks-sdk
+
+    - name: Download model from Databricks
+      env:
+        DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+        DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+        DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        MODEL_NAME: ${{ github.event.client_payload.model_name }}
+        MODEL_VERSION: ${{ github.event.client_payload.version }}
+      run: python ci/download_model.py
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-south-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build Docker image
+      run: docker build -t ml-model:${{ github.event.client_payload.version }} .
+
+    - name: Tag image
+      run: |
+        docker tag ml-model:${{ github.event.client_payload.version }} \
+        ${{ steps.login-ecr.outputs.registry }}/ml-model:${{ github.event.client_payload.version }}
+
+    - name: Push image to ECR
+      run: |
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/ml-model:${{ github.event.client_payload.version }}
