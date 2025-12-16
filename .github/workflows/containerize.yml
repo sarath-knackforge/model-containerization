@@ -19,7 +19,9 @@ jobs:
       DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
       DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
       DATABRICKS_AUTH_TYPE: oauth
+
       MLFLOW_ENABLE_DB_SDK: "true"
+      MLFLOW_TRACKING_URI: databricks
 
       # ===== AWS / ECR =====
       AWS_REGION: ap-south-1
@@ -52,9 +54,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install \
-            mlflow==2.12.2 \
-            databricks-sdk==0.36.0
+          pip install mlflow==2.12.2 databricks-sdk==0.36.0
+          pip uninstall -y databricks-cli
 
 
       - name: Debug Databricks env
