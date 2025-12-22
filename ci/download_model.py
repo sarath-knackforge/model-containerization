@@ -1,27 +1,29 @@
 import os
-import mlflow
+import requests
+from databricks.sdk import WorkspaceClient
 
-# 1. Force use of Unity Catalog and Databricks
-mlflow.set_tracking_uri("databricks")
-mlflow.set_registry_uri("databricks-uc")
+MODEL_NAME = os.environ["MODEL_NAME"]
+MODEL_VERSION = os.environ["MODEL_VERSION"]
 
-# 2. Extract env vars
-MODEL_NAME = os.environ.get("MODEL_NAME")
-MODEL_VERSION = os.environ.get("MODEL_VERSION")
-LOCAL_PATH = "model"
+client = WorkspaceClient()
 
 print(f"📦 Downloading model {MODEL_NAME} version {MODEL_VERSION}")
 
-# 3. Use the standardized models:/ URI
-model_uri = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
+resp = client.model_versions.get_download_uri(
+    name=MODEL_NAME,
+    version=MODEL_VERSION
+)
 
-os.makedirs(LOCAL_PATH, exist_ok=True)
+url = resp.artifact_uri
 
-try:
-    # download_artifacts is the most stable way to pull from UC
-    local_path = mlflow.artifacts.download_artifacts(artifact_uri=model_uri, dst_path=LOCAL_PATH)
-    print(f"✅ Model downloaded successfully to {local_path}")
-except Exception as e:
-    print(f"❌ Error during download: {e}")
-    # Force the script to fail so the GitHub Action stops
-    exit(1)
+with requests.get(url, stream=True) as r:
+    r.raise_for_status()
+    with open("model.zip", "wb") as f:
+        for chunk in r.iter_content(8192):
+            f.write(chunk)
+
+import zipfile
+with zipfile.ZipFile("model.zip") as z:
+    z.extractall("model")
+
+print("✅ Model downloaded and extracted")
