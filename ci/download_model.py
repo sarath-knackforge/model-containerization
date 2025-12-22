@@ -1,29 +1,26 @@
 import os
 import mlflow
-from mlflow.store.artifact.models_artifact_repo import ModelsArtifactRepository
 
-# Ensure you have MLflow installed: pip install mlflow
+# Force MLflow to use Unity Catalog for the model registry
+mlflow.set_registry_uri("databricks-uc")
+mlflow.set_tracking_uri("databricks")
 
 MODEL_NAME = os.environ["MODEL_NAME"]
 MODEL_VERSION = os.environ["MODEL_VERSION"]
 LOCAL_PATH = "model"
 
-# Set the MLflow tracking URI to "databricks" so it authenticates correctly
-mlflow.set_tracking_uri("databricks")
-
 print(f"📦 Downloading model {MODEL_NAME} version {MODEL_VERSION}")
 
-# Define the MLflow model URI using the "models:/" scheme
+# Define the MLflow model URI
 model_uri = f"models:/{MODEL_NAME}/{MODEL_VERSION}"
 
-# Create the destination directory if it doesn't exist
 os.makedirs(LOCAL_PATH, exist_ok=True)
 
-# Use the ModelsArtifactRepository to download the artifacts
-# The "" as the first argument downloads the entire root of the model's artifacts
 try:
-    local_path = ModelsArtifactRepository(model_uri).download_artifacts("", dst_path=LOCAL_PATH)
+    # Use the higher-level mlflow.artifacts API which is more robust
+    local_path = mlflow.artifacts.download_artifacts(artifact_uri=model_uri, dst_path=LOCAL_PATH)
     print(f"✅ Model downloaded successfully to {local_path}")
 except Exception as e:
     print(f"❌ Error during download: {e}")
-
+    # Re-raise the error so the GitHub Action fails if the download fails
+    raise e
